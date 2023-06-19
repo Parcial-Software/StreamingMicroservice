@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
 using StreamingMicroservice.Services.Blob;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -17,11 +19,13 @@ namespace StreamingMicroservice.Controllers
     {
         private readonly DataContext _context;
         private readonly IBlobService _blob;
+        private readonly IBusSender _sender;
 
-        public SongsController(DataContext context, IBlobService blob)
+        public SongsController(DataContext context, IBlobService blob, IBusSender sender = null)
         {
             _context = context;
             _blob = blob;
+            _sender = sender;
         }
 
         // GET: api/Songs
@@ -33,6 +37,26 @@ namespace StreamingMicroservice.Controllers
               return NotFound();
           }
             return await _context.Songs.ToListAsync();
+        }
+
+        [HttpGet("gender/{genderId}")]
+        public async Task<ActionResult<List<Song>>> GetSongsByGenderId(int genderId)
+        {
+            if (_context.Genders == null)
+            {
+                return NotFound();
+            }
+            var gender = await _context.Genders.FindAsync(genderId);
+            if (gender == null)
+            {
+                return NotFound("GenderId no found");
+            }
+
+            var songs = await _context.Songs
+                .Where(x => x.GenderId == genderId)
+                .ToListAsync();
+
+            return songs;
         }
 
         // GET: api/Songs/5
@@ -68,6 +92,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Song>
+                {
+                    Data = song,
+                    Action = (int)MessageAction.Update,
+                    Table = "Songs"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -101,6 +132,13 @@ namespace StreamingMicroservice.Controllers
 
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Song>
+            {
+                Data = song,
+                Action = (int)MessageAction.Update,
+                Table = "Songs"
+            });
+
             return Ok(song);
         }
 
@@ -121,6 +159,13 @@ namespace StreamingMicroservice.Controllers
 
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Song>
+            {
+                Data = song,
+                Action = (int)MessageAction.Update,
+                Table = "Songs"
+            });
+
             return Ok(song);
         }
 
@@ -135,6 +180,13 @@ namespace StreamingMicroservice.Controllers
           }
             _context.Songs.Add(song);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Song>
+            {
+                Data = song,
+                Action = (int)MessageAction.Create,
+                Table = "Songs"
+            });
 
             return CreatedAtAction("GetSong", new { id = song.Id }, song);
         }
@@ -155,6 +207,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Songs.Remove(song);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Song>
+            {
+                Data = song,
+                Action = (int)MessageAction.Delete,
+                Table = "Songs"
+            });
 
             return NoContent();
         }

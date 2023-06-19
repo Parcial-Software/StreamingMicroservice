@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace StreamingMicroservice.Controllers
     public class SuscriptionsController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public SuscriptionsController(DataContext context)
+        public SuscriptionsController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Suscriptions
@@ -65,6 +68,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Suscription>
+                {
+                    Data = suscription,
+                    Action = (int)MessageAction.Update,
+                    Table = "Suscriptions"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -93,6 +103,13 @@ namespace StreamingMicroservice.Controllers
             _context.Suscriptions.Add(suscription);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Suscription>
+            {
+                Data = suscription,
+                Action = (int)MessageAction.Create,
+                Table = "Suscriptions"
+            });
+
             return CreatedAtAction("GetSuscription", new { id = suscription.Id }, suscription);
         }
 
@@ -112,6 +129,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Suscriptions.Remove(suscription);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Suscription>
+            {
+                Data = suscription,
+                Action = (int)MessageAction.Delete,
+                Table = "Suscriptions"
+            });
 
             return NoContent();
         }

@@ -13,10 +13,8 @@
         public int Downloads { get; set; }
         public int AlbumId { get; set; }
         public int GenderId { get; set; }
-        public int PlaylistId { get; set; }
         
         public Album? Album { get; set; } 
         public Gender? Gender { get; set; } 
-        public Playlist? Playlist { get; set; }
     }
 }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace StreamingMicroservice.Controllers
     public class PaymentsController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public PaymentsController(DataContext context)
+        public PaymentsController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Payments
@@ -65,6 +68,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Payment>
+                {
+                    Data = payment,
+                    Action = (int)MessageAction.Update,
+                    Table = "Payments"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -93,6 +103,13 @@ namespace StreamingMicroservice.Controllers
             _context.Payments.Add(payment);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Payment>
+            {
+                Data = payment,
+                Action = (int)MessageAction.Create,
+                Table = "Payments"
+            });
+
             return CreatedAtAction("GetPayment", new { id = payment.Id }, payment);
         }
 
@@ -112,6 +129,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Payments.Remove(payment);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Payment>
+            {
+                Data = payment,
+                Action = (int)MessageAction.Delete,
+                Table = "Payments"
+            });
 
             return NoContent();
         }

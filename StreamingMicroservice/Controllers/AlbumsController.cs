@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
 using StreamingMicroservice.Services.Blob;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -17,11 +18,13 @@ namespace StreamingMicroservice.Controllers
     {
         private readonly DataContext _context;
         private readonly IBlobService _blob;
+        private readonly IBusSender _sender;
 
-        public AlbumsController(DataContext context, IBlobService blob)
+        public AlbumsController(DataContext context, IBlobService blob, IBusSender sender)
         {
             _context = context;
             _blob = blob;
+            _sender = sender;
         }
 
         // GET: api/Albums
@@ -104,6 +107,26 @@ namespace StreamingMicroservice.Controllers
             return Ok(album);
         }
 
+        [HttpGet("user/{userId}")]
+        public async Task<ActionResult<List<Album>>> GetAlbumsByUserId(int userId)
+        {
+            if (_context.Albums == null)
+            {
+                return NotFound();
+            }
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound("UserId no found");
+            }
+
+            var albums = await _context.Albums
+                .Where(x => x.UserId == userId)
+                .ToListAsync();
+
+            return albums;
+        }
+
         // POST: api/Albums
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
@@ -115,6 +138,13 @@ namespace StreamingMicroservice.Controllers
           }
             _context.Albums.Add(album);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Album>
+            {
+                Data = album,
+                Action = (int) MessageAction.Create,
+                Table = "Albums"
+            });
 
             return CreatedAtAction("GetAlbum", new { id = album.Id }, album);
         }

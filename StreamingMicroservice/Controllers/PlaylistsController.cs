@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +17,12 @@ namespace StreamingMicroservice.Controllers
     public class PlaylistsController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public PlaylistsController(DataContext context)
+        public PlaylistsController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Playlists
@@ -65,7 +69,8 @@ namespace StreamingMicroservice.Controllers
 
             var playlists = await _context.Playlists
                 .Where(x => x.UserId == userId)
-                .Include(x => x.Songs)
+                .Include(x => x.PlaylistSongs)!
+                    .ThenInclude(x => x.Song)
                 .ToListAsync();
 
             return playlists;
@@ -86,6 +91,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Playlist>
+                {
+                    Data = playlist,
+                    Action = (int)MessageAction.Update,
+                    Table = "Playlists"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -121,6 +133,13 @@ namespace StreamingMicroservice.Controllers
             _context.Playlists.Add(playlist);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Playlist>
+            {
+                Data = playlist,
+                Action = (int)MessageAction.Create,
+                Table = "Playlists"
+            });
+
             return CreatedAtAction("GetPlaylist", new { id = playlist.Id }, playlist);
         }
 
@@ -140,6 +159,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Playlists.Remove(playlist);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Playlist>
+            {
+                Data = playlist,
+                Action = (int)MessageAction.Delete,
+                Table = "Playlists"
+            });
 
             return NoContent();
         }

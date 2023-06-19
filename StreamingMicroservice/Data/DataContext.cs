@@ -22,6 +22,7 @@ namespace StreamingMicroservice.Data
         public DbSet<Song> Songs { get; set; }
         public DbSet<Favorite> Favorite { get; set; } = default!;
         public DbSet<History> History { get; set; } = default!;
+        public DbSet<StreamingMicroservice.Models.PlaylistSong> PlaylistSong { get; set; } = default!;
 
 
 

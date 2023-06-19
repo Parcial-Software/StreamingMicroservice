@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Services.Blob;
+using StreamingMicroservice.Services.Bus;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,10 +10,14 @@ var cs = builder.Configuration.GetConnectionString("StreamingDb");
 var blobSection = builder.Configuration.GetSection("BlobSettings");
 builder.Services.Configure<BlobSettings>(blobSection);
 
+var busSetting = builder.Configuration.GetSection("BusSettings");
+builder.Services.Configure<BusSettings>(busSetting);
+
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options => options.UseSqlServer(cs));
 
 builder.Services.AddScoped<IBlobService, BlobService>();
+builder.Services.AddScoped<IBusSender, BusSender>();
 
 builder.Services.AddControllers().AddJsonOptions(
     x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);

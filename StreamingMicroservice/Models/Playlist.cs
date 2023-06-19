@@ -7,6 +7,6 @@
         public int UserId { get; set; }
 
         public User? User { get; set; }
-        public List<Song>? Songs { get; set; }
+        public List<PlaylistSong>? PlaylistSongs { get; set; }
     }
 }

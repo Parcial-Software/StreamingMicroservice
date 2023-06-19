@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
 using StreamingMicroservice.Services.Blob;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -17,11 +18,13 @@ namespace StreamingMicroservice.Controllers
     {
         private readonly DataContext _context;
         private readonly IBlobService _blob;
+        private readonly IBusSender _sender;
 
-        public GendersController(DataContext context, IBlobService blob)
+        public GendersController(DataContext context, IBlobService blob, IBusSender sender = null)
         {
             _context = context;
             _blob = blob;
+            _sender = sender;
         }
 
         // GET: api/Genders
@@ -70,6 +73,13 @@ namespace StreamingMicroservice.Controllers
 
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Gender>
+            {
+                Data = gender,
+                Action = (int)MessageAction.Update,
+                Table = "Genders"
+            });
+
             return Ok(gender);                                      
         }
 
@@ -88,6 +98,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Gender>
+                {
+                    Data = gender,
+                    Action = (int)MessageAction.Update,
+                    Table = "Genders"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -119,6 +136,13 @@ namespace StreamingMicroservice.Controllers
             _context.Genders.Add(gender);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Gender>
+            {
+                Data = gender,
+                Action = (int)MessageAction.Create,
+                Table = "Genders"
+            });
+
             return CreatedAtAction("GetGender", new { id = gender.Id }, gender);
         }
 
@@ -138,6 +162,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Genders.Remove(gender);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Gender>
+            {
+                Data = gender,
+                Action = (int)MessageAction.Delete,
+                Table = "Genders"
+            });
 
             return NoContent();
         }

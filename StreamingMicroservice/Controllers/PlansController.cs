@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace StreamingMicroservice.Controllers
     public class PlansController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public PlansController(DataContext context)
+        public PlansController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Plans
@@ -65,6 +68,14 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Plan>
+                {
+                    Data = plan,
+                    Action = (int)MessageAction.Update,
+                    Table = "Plans"
+                });
+
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -93,6 +104,13 @@ namespace StreamingMicroservice.Controllers
             _context.Plans.Add(plan);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Plan>
+            {
+                Data = plan,
+                Action = (int)MessageAction.Create,
+                Table = "Plans"
+            });
+
             return CreatedAtAction("GetPlan", new { id = plan.Id }, plan);
         }
 
@@ -112,6 +130,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Plans.Remove(plan);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Plan>
+            {
+                Data = plan,
+                Action = (int)MessageAction.Delete,
+                Table = "Plans"
+            });
 
             return NoContent();
         }

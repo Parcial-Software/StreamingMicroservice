@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.DTOs;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -16,10 +17,12 @@ namespace StreamingMicroservice.Controllers
     public class UsersController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public UsersController(DataContext context)
+        public UsersController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Users
@@ -66,6 +69,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<User>
+                {
+                    Data = user,
+                    Action = (int)MessageAction.Update,
+                    Table = "Users"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -95,6 +105,13 @@ namespace StreamingMicroservice.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<User>
+            {
+                Data = user,
+                Action = (int)MessageAction.Create,
+                Table = "Users"
+            });
+
             return CreatedAtAction("GetUser", new { id = user.Id }, user);
         }
 
@@ -114,6 +131,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<User>
+            {
+                Data = user,
+                Action = (int)MessageAction.Delete,
+                Table = "Users"
+            });
 
             return NoContent();
         }

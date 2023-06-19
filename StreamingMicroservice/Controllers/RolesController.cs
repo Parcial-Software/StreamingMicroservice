@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace StreamingMicroservice.Controllers
     public class RolesController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public RolesController(DataContext context)
+        public RolesController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Roles
@@ -65,6 +68,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Role>
+                {
+                    Data = role,
+                    Action = (int)MessageAction.Update,
+                    Table = "Roles"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -93,6 +103,13 @@ namespace StreamingMicroservice.Controllers
             _context.Roles.Add(role);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Role>
+            {
+                Data = role,
+                Action = (int)MessageAction.Create,
+                Table = "Roles"
+            });
+
             return CreatedAtAction("GetRole", new { id = role.Id }, role);
         }
 
@@ -112,6 +129,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Roles.Remove(role);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Role>
+            {
+                Data = role,
+                Action = (int)MessageAction.Delete,
+                Table = "Roles"
+            });
 
             return NoContent();
         }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace StreamingMicroservice.Controllers
     public class HistoriesController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public HistoriesController(DataContext context)
+        public HistoriesController(DataContext context, IBusSender sender = null)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Histories
@@ -65,6 +68,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<History>
+                {
+                    Data = history,
+                    Action = (int)MessageAction.Update,
+                    Table = "Histories"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -93,6 +103,13 @@ namespace StreamingMicroservice.Controllers
             _context.History.Add(history);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<History>
+            {
+                Data = history,
+                Action = (int)MessageAction.Create,
+                Table = "Histories"
+            });
+
             return CreatedAtAction("GetHistory", new { id = history.Id }, history);
         }
 
@@ -112,6 +129,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.History.Remove(history);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<History>
+            {
+                Data = history,
+                Action = (int)MessageAction.Delete,
+                Table = "Histories"
+            });
 
             return NoContent();
         }

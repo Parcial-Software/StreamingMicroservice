@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StreamingMicroservice.Data;
 using StreamingMicroservice.Models;
+using StreamingMicroservice.Services.Bus;
 
 namespace StreamingMicroservice.Controllers
 {
@@ -15,10 +16,12 @@ namespace StreamingMicroservice.Controllers
     public class FavoritesController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IBusSender _sender;
 
-        public FavoritesController(DataContext context)
+        public FavoritesController(DataContext context, IBusSender sender)
         {
             _context = context;
+            _sender = sender;
         }
 
         // GET: api/Favorites
@@ -65,6 +68,14 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Favorite>
+                {
+                    Data = favorite,
+                    Action = (int)MessageAction.Update,
+                    Table = "Favorites"
+                });
+
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -93,6 +104,13 @@ namespace StreamingMicroservice.Controllers
             _context.Favorite.Add(favorite);
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Favorite>
+            {
+                Data = favorite,
+                Action = (int)MessageAction.Create,
+                Table = "Favorites"
+            });
+
             return CreatedAtAction("GetFavorite", new { id = favorite.Id }, favorite);
         }
 
@@ -112,6 +130,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Favorite.Remove(favorite);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Favorite>
+            {
+                Data = favorite,
+                Action = (int)MessageAction.Delete,
+                Table = "Favorites"
+            });
 
             return NoContent();
         }
