@@ -71,6 +71,13 @@ namespace StreamingMicroservice.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                await _sender.SendMessage(new Message<Album>
+                {
+                    Data = album,
+                    Action = (int)MessageAction.Update,
+                    Table = "Albums"
+                });
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -104,6 +111,13 @@ namespace StreamingMicroservice.Controllers
 
             await _context.SaveChangesAsync();
 
+            await _sender.SendMessage(new Message<Album>
+            {
+                Data = album,
+                Action = (int)MessageAction.Update,
+                Table = "Albums"
+            });
+
             return Ok(album);
         }
 
@@ -123,6 +137,8 @@ namespace StreamingMicroservice.Controllers
             var albums = await _context.Albums
                 .Where(x => x.UserId == userId)
                 .ToListAsync();
+
+
 
             return albums;
         }
@@ -165,6 +181,13 @@ namespace StreamingMicroservice.Controllers
 
             _context.Albums.Remove(album);
             await _context.SaveChangesAsync();
+
+            await _sender.SendMessage(new Message<Album>
+            {
+                Data = album,
+                Action = (int)MessageAction.Delete,
+                Table = "Albums"
+            });
 
             return NoContent();
         }
